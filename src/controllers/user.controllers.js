@@ -4,6 +4,7 @@ import { User } from "../models/User.models.js"
 import { uploadOnCloudinary } from "../utils/cloudinary.js"
 import { ApiResponse } from "../utils/ApiResponse.js";
 import{Jwt} from "jsonwebtoken" 
+import mongoose from "mongoose";
 
 
 
@@ -256,7 +257,7 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
 })
 
 
-const changePassword = asyncHandler(async (req, res) => {
+const changeCurrentPassword = asyncHandler(async (req, res) => {
     const { oldPassword, newPassword } = req.body
 
     const user = await User.findById(req.user?._id)
@@ -450,15 +451,65 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
 
 
 
+const getWatchHistory = asyncHandler(async (res, res) => {
+    
+    const user = await User.aggregate([
+        {
+            $match: {
+                _id: new mongoose.Types.ObjectId(req.user._id)
+            }
+        },
+
+        {
+            $lookup: {
+                from: "Video",
+                localField: "watchHistory",
+                foreignField: "_id",
+                as: "watchHistory",
+                pipeline: [{
+                    $lookup: {
+                        from: "User",
+                        localField: "owner",
+                        foreignField: "_id",
+                        as: "owner",
+                        pipeline: [{
+                            $project: {
+                                fullName: 1,
+                                username: 1,
+                                avatar:1
+                            }
+                        }
+                        ]
+                    }
+                },
+                    {
+                        $addFields: {
+                            owner: {
+                                $first:"$owner"
+                            }
+                        }
+                    }
+                ]
+            }
+        }
+    ])
+
+    return res
+        .status(200)
+        .json(new ApiResponse(200, user[0].WatchHistory, "watch history fetched successfully"))
+})
+
+
 export {
     registerUser,
     loginUser,
     logoutUser,
     refreshAccessToken,
-    changePassword,
+    changeCurrentPassword,
     getCurrentUser,
     upadateAccountDetails,
     updateUserAvatar,
     updateUserCoverImage,
     getUserChannelProfile,
+    getWatchHistory,
 }
